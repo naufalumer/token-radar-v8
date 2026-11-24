@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Token Radar</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="tick" aria-hidden="true"><div class="tick-in" id="tick-top"></div></div>
+<header class="top">
+  <div class="brand"><span class="pulse" aria-hidden="true"></span><div><h1>TOKEN RADAR</h1><span class="by">by tyrmeapart</span></div></div>
+  <p class="tag">Every protocol DefiLlama tracks, ranked by what its token launch would be worth, and how to farm each one.</p>
+  <p class="meta" id="meta">Loading snapshot...</p>
+  <div class="stats" id="stats"></div>
+  <nav class="tabs" aria-label="Views">
+    <button data-tab="board" class="active" type="button">Board</button>
+    <button data-tab="live" type="button">Live tokens</button>
+    <button data-tab="model" type="button">The model</button>
+    <button data-tab="news" type="button">News</button>
+  </nav>
+</header>
+
+<main>
+  <section id="tab-board" class="tab active">
+    <div class="picks" id="picks"></div>
+    <div class="modelstrip" id="modelstrip">Pricing the board...</div>
+    <div class="backteststrip" id="backteststrip">
+      <span class="bt-label">Backtest - did this model predict realized values?</span>
+      <span class="bt-text">On 2026-10-15 this same model priced 113 live-token protocols from their TVL that day; by 2026-11-14 their real market caps were known. Median error 84.8% for the shipped model, 96.7% for the flat median, 30.3% for persistence. Within twice the realized value: 35.4% shipped, 27.4% flat, 91.2% persistence. Spearman against realized caps: 0.469 shipped, 0.475 flat, 0.985 persistence. The nested backtest, each fold's calibration fitted without that fold's peers, is median error 89.6%. Full table in The model.</span>
+    </div>
+    <div class="views" id="viewpills" role="group" aria-label="View mode">
+      <button data-view="all" class="active" type="button">All</button>
+      <button data-view="watch" type="button">Watchlist</button>
+      <button data-view="hot" type="button">Heating up</button>
+      <button data-view="early" type="button">Early</button>
+      <button data-view="new" type="button">New pairs</button>
+    </div>
+    <div class="chainpills" id="chainpills"></div>
+    <div class="controls">
+      <label>Search <input id="q" type="search" placeholder="protocol name or slug" autocomplete="off"></label>
+      <label>Chain <select id="chain"><option value="">All chains</option></select></label>
+      <label>Category <select id="cat"><option value="">All categories</option></select></label>
+      <label>Sort <select id="sort">
+        <option value="implied">Implied value</option>
+        <option value="tvl">TVL</option>
+        <option value="growth">7-day growth</option>
+        <option value="age">Age</option>
+        <option value="name">Name A-Z</option>
+      </select></label>
+    </div>
+    <p class="count" id="count"></p>
+    <div class="tablewrap">
+    <table id="board">
+      <thead><tr>
+        <th class="num">#</th><th>Protocol</th><th>Trend</th><th>Category</th><th>Chains</th>
+        <th class="num">TVL</th><th class="num">7d</th><th class="num">Age</th>
+        <th class="num">Implied value</th><th>Signals</th><th></th>
+      </tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    </div>
+    <p>Implied value is this radar's own claim, computed from the snapshot, never a market price. "Records no token" means the record carries none, not proof it has none. Sparklines and detail charts are modeled TVL paths from the snapshot's 7-day change, illustrative only, not market data.</p>
+  </section>
+
+  <section id="tab-live" class="tab">
+    <h2>Live tokens - the market's own values</h2>
+    <p>These protocols already trade, so the board does not rank them. Their market-cap-to-TVL ratios are the calibration the model learns from: the median ratio per category sets each pre-token multiple, and the one pooled size tilt is fitted on all of them together.</p>
+    <div class="tablewrap">
+    <table>
+      <thead><tr><th>Protocol</th><th>Category</th><th class="num">TVL</th><th class="num">Market cap</th><th class="num">mcap / TVL</th><th class="num">7d</th></tr></thead>
+      <tbody id="live"></tbody>
+    </table>
+    </div>
+  </section>
+
+  <section id="tab-news" class="tab">
+    <h2>Radar news - only what the snapshot says</h2>
+    <p>Every item comes from the sealed snapshot's own facts (a mover, a new listing, the watchlist) or the radar's own records (the backtest, the model version). Each item names its source and the snapshot date. Nothing is fetched live and nothing is invented about a protocol.</p>
+    <div id="newslist"></div>
+  </section>
+
+  <section id="tab-model" class="tab">
+    <h2>The model - radar-8: one pooled tilt, an out-of-fold calibration, a backtest, and a plot of the held-out tokens</h2>
+    <p>The version label is the radar's generation count: v2 was radar-3, v3 radar-4, v4 radar-5, v5 radar-6, v6 radar-7. This version, radar-8, changes nothing in the model, only the terminal that presents it: same pooled tilt, same calibration layer, same full formula, same backtest, same board. New here is the presentation: a terminal board with sparklines, chain tickers, a detail chart, a token file that says which fields the snapshot does not carry, and a news tab from snapshot facts only.</p>
+    <div class="formula">
+      <p><strong>implied = calibrate(TVL x fitted multiple x growth x maturity x chain reach)</strong>, where <strong>fitted multiple = category multiple x size tilt</strong></p>
+      <ul>
+        <li><strong>Category multiple</strong> - median market-cap / TVL of the live-token protocols in the same category (3+ peers), else the whole-market median; clamped to 0.02-1.00.</li>
+        <li><strong>Size tilt - one pooled fit, not one per category.</strong> Log(market cap) regressed on log(TVL) over all live-token protocols at once (CEX excluded); the tilt is 1 at the market's median live TVL and is applied at half the fitted strength, clamped to 0.50-1.50, because the fit is weak and a full-strength tilt would price the giants far below their own category's peers, an extrapolation, not a measurement.</li>
+        <li><strong>Growth</strong> - 1 + clamp(7-day TVL change, -50%, +100%) x 0.6.</li>
+        <li><strong>Maturity</strong> - 0.70 + min(age, 1095 days) / 1095 x 0.30; unknown age counts as 365 days.</li>
+        <li><strong>Chain reach</strong> - 1 + min(chains - 1, 5) x 0.02.</li>
+        <li><strong>Calibration - out-of-fold shrinkage on the full formula.</strong> The raw formula's errors are worst in the tails: its median error barely moved against the flat median while its trimmed mean fell hard, which says the middle is fine and the extremes are wrong. So a winsorized log-space line, fitted only on out-of-fold predictions of the live peers, maps log(raw) to log(calibrated). The raw formula's spread is wider than the held-out peers' market-cap/TVL spread, so a monotone shrinkage map compresses its extremes. It improves five of six nested-validation metrics; it does not establish that calibrated values are launch prices. The shift for any one protocol is capped at +-0.75 decades (about 5.6x), and the numbers below are the honest nested measurement, each fold's map fitted without that fold's peers.</li>
+      </ul>
+      <p id="valid">Validating the tilt...</p>
+      <p id="calibtext">Fitting the calibration...</p>
+      <p>Why one pooled fit: per-category fits were run and rejected, with 5 to 15 live peers per category they lose to the pooled fit on five of six validation checks. Fitting one slope per category sounds more precise; on about 120 tokens it is mostly noise wearing a slope. The within-category slope ties the pooled fit, so it stays out for no gain.</p>
+      <p>No protocol name is special-cased. The calibration table below is recomputed from whatever snapshot the program is handed, so the radar keeps working on protocols that do not exist yet.</p>
+    </div>
+    <h3>Actual vs predicted - the held-out tokens, on a log scale</h3>
+    <p>Each dot is one held-out live token: the full formula's price (amber, open) and its nested-calibrated price (green, filled) against the token's true market cap. 119 pairs. Spearman against the true caps: raw 0.376, calibrated 0.366. Within twice the true value: raw 31 of 119 (26.1%), calibrated 41 of 119 (34.5%). Points below the 1:1 line are overestimates; the dashed lines are 2x either way. The calibration compresses the cloud toward the line, but the scatter stays wide: most tokens are still priced more than twice wrong. The pairs are in the generated data.js payload, so the plot is the validation's own data, not a drawing.</p>
+    <div class="avp" id="avp-plot">Plotting the held-out pairs...</div>
+    <h3>Backtest - the model priced real tokens 30 days ago; here is what happened</h3>
+    <p>Every validation above is cross-sectional: it prices a live token today and compares it with today's market cap. It never asks whether the model predicts what a value <em>becomes</em>. The backtest asks exactly that. On 2026-10-15 the shipped model, every piece fitted on 2026-10-15 data only, priced 113 live-token protocols from their TVL on that day. By 2026-11-14 their realized market caps were known (the sealed snapshot's own figures). Two baselines: the flat category median as of 2026-10-15, and <strong>persistence</strong>, each token's own market cap on 2026-10-15 carried forward unchanged. A model that cannot beat persistence on levels is a ranker, not a forecaster; the table says which this one is, and the per-category table names where it wins and where it loses. TVL history: DeFiLlama daily TVL per protocol. Market-cap history: CoinGecko daily market cap per token. 6 peers were excluded for missing history (acryptos, fables, frankencoin, kava-lend, pumpbtc, concrete); none were dropped for scoring badly.</p>
+    <p id="backtesttext">Backtest: median error 84.8% for the shipped model, 96.7% for the flat median, 30.3% for persistence. Within twice the realized value: 35.4% shipped, 27.4% flat, 91.2% persistence. Spearman against realized caps: 0.469 shipped, 0.475 flat, 0.985 persistence. The nested backtest, each fold's calibration fitted without that fold's peers, is median error 89.6%, trimmed mean 178.6%, 69 of 113 priced closer than flat, Spearman 0.368, log error 0.664, within 2x 35.4%.</p>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Rule (priced 2026-10-15, scored 2026-11-14)</th><th class="num">Median error</th><th class="num">Trimmed mean</th><th class="num">Wins / 113</th><th class="num">Spearman</th><th class="num">Log error</th><th class="num">Within 2x</th></tr></thead>
+      <tbody>
+      <tr><td>flat category median (t0)</td><td class="num">96.7%</td><td class="num">233.2%</td><td class="num">0 / 113</td><td class="num">0.475</td><td class="num">0.717</td><td class="num">27.4%</td></tr>
+      <tr><td>pooled size tilt (t0)</td><td class="num">86.2%</td><td class="num">181.2%</td><td class="num">69 / 113</td><td class="num">0.484</td><td class="num">0.658</td><td class="num">38.1%</td></tr>
+      <tr><td>full formula, uncalibrated (t0)</td><td class="num">86.2%</td><td class="num">164.9%</td><td class="num">67 / 113</td><td class="num">0.469</td><td class="num">0.659</td><td class="num">34.5%</td></tr>
+      <tr><td>persistence - mcap on 2026-10-15 carried forward</td><td class="num">30.3%</td><td class="num">29.8%</td><td class="num">91 / 113</td><td class="num">0.985</td><td class="num">0.147</td><td class="num">91.2%</td></tr>
+      <tr><td>full formula + calibration (shipped)</td><td class="num">84.8%</td><td class="num">163.2%</td><td class="num">68 / 113</td><td class="num">0.469</td><td class="num">0.632</td><td class="num">35.4%</td></tr>
+      </tbody>
+    </table></div>
+    <h3>Backtest by category - where the model beat persistence, and where it did not</h3>
+    <p>Median error against realized values per category. "Shipped wins" counts peers the shipped model priced closer than the flat median. Categories with fewer than 3 peers fold into "Other (n &lt; 3)".</p>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Category</th><th class="num">Peers</th><th class="num">Median error, shipped</th><th class="num">Median error, flat</th><th class="num">Median error, persistence</th><th class="num">Shipped wins</th><th>Verdict</th></tr></thead>
+      <tbody id="btcat"></tbody>
+    </table></div>
+    <h3>Calibration - what the shrinkage did</h3>
+    <p>Out-of-fold predictions of the live peers, before and after the map. The "fitted view" is the map's own look at its training predictions; the nested numbers below are the honest measure.</p>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Out-of-fold, live peers</th><th class="num">Log error</th><th class="num">Median error</th><th class="num">Trimmed mean</th></tr></thead>
+      <tbody id="calibtable"></tbody>
+    </table></div>
+    <h3>Most moved by the calibration - where the shrinkage bit hardest</h3>
+    <p>The ten board rows the calibration moved the farthest. A negative shift compresses a high raw value down; a positive one lifts a low one up. The shift is capped at +-0.75 decades. The map corrects the formula's spread; it does not claim the calibrated value is what the market would pay.</p>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Protocol</th><th class="num">Raw value</th><th class="num">Calibrated value</th><th class="num">Shift (decades)</th></tr></thead>
+      <tbody id="shrunk"></tbody>
+    </table></div>
+    <h3>Calibration - market-cap / TVL by category</h3>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Category</th><th class="num">Multiple</th><th class="num">Live peers</th><th>Source</th></tr></thead>
+      <tbody id="calib"></tbody>
+    </table></div>
+    <h3>What was tested - six pricing rules, same five folds, six checks each</h3>
+    <p>Each held-out live token is priced six ways, each fold fitting the rule exactly as the board fits it. Wins count against the flat category median for every rule. The shipped rule is the full formula with calibration.</p>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Rule</th><th class="num">Median error</th><th class="num">Trimmed mean</th><th class="num">Wins / 119</th><th class="num">Spearman</th><th class="num">Log error</th><th class="num">Within 2x</th></tr></thead>
+      <tbody id="cand"></tbody>
+    </table></div>
+    <h3>Where the tilt wins and loses - by category</h3>
+    <p>Median error per category, flat median vs pooled tilt. A category the tilt loses in is named here.</p>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Category</th><th class="num">Peers</th><th class="num">Median error, flat</th><th class="num">Median error, tilt</th><th class="num">Tilt wins</th><th>Verdict</th></tr></thead>
+      <tbody id="bycat"></tbody>
+    </table></div>
+    <h3>Sandbox - move the dials, watch the board re-rank</h3>
+    <p>Change a weight and the top 10 re-ranks live. The board always shows the published model; this is the reader's what-if. Tilt 1 is the published half-strength tilt, 0 is no tilt. Calibration 1 is the published map, 0 is the raw formula.</p>
+    <div class="sandbox">
+      <label>Growth <input id="sb-growth" type="range" min="0" max="1.5" step="0.05" value="0.6"> <output id="sb-growth-v">0.60</output></label>
+      <label>Maturity <input id="sb-mat" type="range" min="0" max="0.6" step="0.02" value="0.3"> <output id="sb-mat-v">0.30</output></label>
+      <label>Tilt strength <input id="sb-tilt" type="range" min="0" max="1.5" step="0.05" value="1"> <output id="sb-tilt-v">1.00</output></label>
+      <label>Multiple cap <input id="sb-cap" type="range" min="0.2" max="2" step="0.05" value="1"> <output id="sb-cap-v">1.00</output></label>
+      <label>Calibration <input id="sb-cal" type="range" min="0" max="1.5" step="0.05" value="1"> <output id="sb-cal-v">1.00</output></label>
+      <ol id="sb-top"></ol>
+    </div>
+  </section>
+
+  <section id="detail" class="detail" hidden>
+    <button id="detail-close" type="button">Back to the board</button>
+    <div id="detail-body"></div>
+  </section>
+</main>
+
+<footer>
+  <p>Snapshot: <span id="src"></span>. Board ranks pre-token protocols only; live-token protocols appear at market values. Implied value is the entry's own claim, never make.fun's, never a prediction a token will be issued.</p>
+  <p>Method: TVL x fitted multiple (category median x one pooled size tilt, fitted from live-token peers) x growth x maturity x chain reach, then calibrated by an out-of-fold log-space map. Backtest: the same model priced live tokens on 2026-10-15 and was scored against their realized market caps on 2026-11-14 (median error 84.8% vs persistence 30.3%). Farm plans are derived from each protocol's category, chains, TVL, age and seven-day growth, never from a hand-kept list of names.</p>
+</footer>
+<div class="tick tick-bot" aria-hidden="true"><div class="tick-in" id="tick-bottom"></div></div>
+<script src="../data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
